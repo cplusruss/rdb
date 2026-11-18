@@ -1,0 +1,12 @@
+# publish only what the program needs to run; everything else stays local
+/*
+!/.gitignore
+!/requirements.txt
+!/install_rdb.bat
+!/build_exe.bat
+!/.github/
+!/src/
+/src/*
+!/src/*.py
+!/src/rdb.ico
+!/src/rdb.bat
