@@ -1,6 +1,8 @@
 # publish only what the program needs to run; everything else stays local
 /*
 !/.gitignore
+!/README.md
+!/screenshots/
 !/requirements.txt
 !/install_rdb.bat
 !/build_exe.bat
