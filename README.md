@@ -1,9 +1,6 @@
 # rdb
 
 A keyboard-first outliner, to-do list and project map for Windows. Everything lives in one `.rdb` file, and the app is a single portable `rdb.exe`. There is no installer, no account and no cloud.
-
-![Map view](screenshots/map.png)
-
 ## Why use it
 
 - **One place for everything.** Projects sit as cards on a zoomable map. Each card opens into a to-do list, a note, or a board of more cards, nested as deep as you like.
@@ -12,15 +9,6 @@ A keyboard-first outliner, to-do list and project map for Windows. Everything li
 - **See work the way you think about it.** Show the same items as a list, as a Kanban board by status (`Ctrl+Shift+K`) or on a timeline.
 - **Built for the keyboard.** Every common action has a shortcut. There is an optional Vim mode, and `F1` lists all the shortcuts.
 - **Your data stays yours.** It is one SQLite-backed file you can copy, back up or sync with any tool. Settings live in `rdb.ini` beside the exe.
-
-## Screenshots
-
-| | |
-|---|---|
-| ![To-do list](screenshots/list.png) | ![Kanban board](screenshots/kanban.png) |
-| To-do list: headings, folds, hashtag pills, priorities and statuses | Kanban board: drag cards between status columns |
-| ![Timeline](screenshots/timeline.png) | ![Finder](screenshots/finder.png) |
-| Timeline of dated items | Finder: search the whole file |
 
 ## Features
 
