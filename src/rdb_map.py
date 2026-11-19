@@ -1748,7 +1748,6 @@ class MapView(QGraphicsView):
     link_clicked = Signal(str, int, bool)
     open_external = Signal(str)
     view_toggled = Signal(object, str)
-    refresh_request = Signal(object)
     undo_request = Signal()
     redo_request = Signal()
     quick_add = Signal()
@@ -2602,11 +2601,11 @@ class MapView(QGraphicsView):
                     lambda: self.view_toggled.emit(item, view),
                 )
             if item.type == "page":
-                for label, sig in (
-                    ("Open in Browser", lambda: self.open_external.emit(item.url)),
-                    ("Refresh Preview", lambda: self.refresh_request.emit(item)),
-                ):
-                    add(label, sig, bool(item.url))
+                add(
+                    "Open in Browser",
+                    lambda: self.open_external.emit(item.url),
+                    bool(item.url),
+                )
             add("Rename", lambda: self._rename(item), sel == [item])
             add("Style...", lambda: self._style(cards))
             menu.addSeparator()

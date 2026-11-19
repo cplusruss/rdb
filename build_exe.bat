@@ -13,6 +13,8 @@ if not defined PY set PY=C:\Python\313\python.exe
  --exclude-module torch --exclude-module tensorflow --exclude-module numba --exclude-module dask ^
  --exclude-module sympy --exclude-module IPython --exclude-module ipykernel --exclude-module jupyter_client ^
  --exclude-module notebook --exclude-module setuptools --exclude-module pkg_resources --exclude-module trio --exclude-module cupy ^
+ --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets ^
+ --exclude-module PySide6.QtWebChannel --exclude-module PySide6.QtWebEngineQuick ^
  "%~dp0src\rdb.py" || exit /b 1
 if not exist dist mkdir dist || exit /b 1
 rem never rdb.exe in the root or src: that name is the pylauncher launcher

@@ -26,9 +26,9 @@ KINDS = (
     Kind("Note", "notepad", "Text page", ""),
     Kind("Text", "text", "Rich text on the map", "t"),
     Kind("Board", "board", "Cards inside a card", ""),
-    Kind("Links", "links", "Link collection with a web viewer", ""),
+    Kind("Links", "links", "Link collection", ""),
     Kind("Timeline", "timeline", "Gantt chart of tasks", ""),
-    Kind("Web page", "page", "Snapshot and tags of a page", ""),
+    Kind("Web page", "page", "Title and tags of a page", ""),
     Kind("Contacts", "contacts", "Names, phones and emails", ""),
 )
 NAME_FONT = QFont("Tahoma", 8, QFont.Weight.Bold)

@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QListView,
     QListWidget,
     QListWidgetItem,
-    QMenu,
     QMessageBox,
     QStyle,
     QStyledItemDelegate,
@@ -187,7 +186,6 @@ class _Card(QStyledItemDelegate):
 
 class LinksGrid(QListWidget):
     opened = Signal(str, bool)
-    refresh = Signal(str)
     leave = Signal()
     edited = Signal(object)
 
@@ -293,26 +291,6 @@ class LinksGrid(QListWidget):
             if url == keep:
                 self.setCurrentItem(item, QItemSelectionModel.SelectionFlag.NoUpdate)
         self._refilter()
-
-    def set_snapshot(self, url, png):
-        for i in range(self.count()):
-            if self.item(i).data(URL_ROLE) == url:
-                self.item(i).setData(SNAP_ROLE, _pixmap(url, png))
-
-    def tile_menu(self, item):
-        menu = QMenu(self)
-        menu.addAction(
-            "Refresh Preview", lambda: self.refresh.emit(item.data(URL_ROLE))
-        )
-        return menu
-
-    def contextMenuEvent(self, e):
-        item = self.itemAt(e.pos())
-        if item is not None:
-            self.setCurrentItem(item)
-            menu = self.tile_menu(item)
-            menu.exec(e.globalPos())
-            menu.deleteLater()
 
     def mouseDoubleClickEvent(self, e):
         super().mouseDoubleClickEvent(e)

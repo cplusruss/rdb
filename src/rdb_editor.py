@@ -5683,8 +5683,7 @@ class Editor(QTextEdit):
                 # the default app, or with Shift the folder that holds it
                 QDesktopServices.openUrl(path_open_url(href, shift))
             else:
-                # the window opens it: the viewer, or with Shift the default browser; an
-                # rdoc spot goes to rdoc
+                # the window opens it in the default browser; an rdoc spot goes to rdoc
                 self.mark_visited(href)
                 self.link_opened.emit(href, shift)
             e.accept()

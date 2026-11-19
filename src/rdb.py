@@ -57,7 +57,6 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QProgressDialog,
-    QSplitter,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -161,11 +160,10 @@ from rdb_triage import PickCard, TriagePage, item_view, open_items
 from rdb_undo import MapEdit, MapStack, snapshot, undoable
 from rdb_urgent import Banner, arrange, due, item_key
 from rdb_urgent_page import PID as URGENT_PID, UrgentPage
-from rdb_web import BLOCKED, WebPane, check_title, fetch_page, fetch_title
+from rdb_web import BLOCKED, check_title, fetch_page, fetch_title
 
 UNDO_LIMIT = 200
 TITLE_FETCHES = 3
-PREVIEW_FETCHES = 3
 
 
 def instance_name():
@@ -175,10 +173,6 @@ def instance_name():
 INSTANCE = instance_name()
 ASFW_ANY = -1
 CTRL_SHIFT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
-WEB_KEYS = {
-    Qt.Key.Key_Right: Qt.Orientation.Horizontal,
-    Qt.Key.Key_Down: Qt.Orientation.Vertical,
-}
 RECENT_MAX = 8
 COPY_GAP_S = 3
 ZOOM_SAVE_MS = 400
@@ -665,9 +659,6 @@ class MainWindow(QMainWindow):
         # true while the cut or copied cards are newer than whatever the system clipboard holds
         self.cut_newer = False
         self.title_queue, self.titles_active = [], 0
-        # link snapshots: (store, url) queued or in flight, and the urls whose fetch failed this session
-        self.preview_queue, self.previews_active = [], 0
-        self.preview_busy, self.preview_failed = set(), set()
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(-50000, -50000, 100000, 100000)
         self.cards = {}
@@ -717,8 +708,6 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.contacts)
         self.triage = TriagePage(self.settings)
         self.stack.addWidget(self.triage)
-        self.web = WebPane()
-        self.web_side = None
         self.left = QWidget()
         left = QVBoxLayout(self.left)
         left.setContentsMargins(0, 0, 0, 0)
@@ -732,13 +721,7 @@ class MainWindow(QMainWindow):
         left.addWidget(self.stack, 1)
         left.addWidget(self.claudeout)
         left.addWidget(self.claudebar)
-        self.split = QSplitter()
-        self.split.addWidget(self.left)
-        self.split.addWidget(self.web)
-        self.split.setStretchFactor(0, 3)
-        self.split.setStretchFactor(1, 2)
-        self.web.hide()
-        self.setCentralWidget(self.split)
+        self.setCentralWidget(self.left)
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.save_current)
@@ -788,7 +771,6 @@ class MainWindow(QMainWindow):
         self.view.link_clicked.connect(self.link_row_clicked)
         self.view.open_external.connect(lambda url: QDesktopServices.openUrl(QUrl(url)))
         self.view.view_toggled.connect(self.card_view)
-        self.view.refresh_request.connect(self.refresh_page_card)
         self.view.clip_ready = lambda: (
             self.card_clipboard is not None or self.copy_buffer is not None
         )
@@ -808,7 +790,6 @@ class MainWindow(QMainWindow):
         self.triage.redo.connect(self.undo_stack.redo)
         self.page.grid.leave.connect(self.go_map)
         self.page.grid.opened.connect(self.open_link)
-        self.page.grid.refresh.connect(self.refresh_preview)
         self.page.grid.edited.connect(self.edit_links)
         self.page.view_changed.connect(self.view_changed)
         self.page.kanban_changed.connect(self.kanban_changed)
@@ -825,7 +806,7 @@ class MainWindow(QMainWindow):
         self.editor.sort_changing.connect(self.save_current)
         self.contacts.changed.connect(self.timer.start)
         self.contacts.leave.connect(self.go_map)
-        self.contacts.web.connect(self.show_web)
+        self.contacts.web.connect(lambda url: QDesktopServices.openUrl(QUrl(url)))
         self.editor.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.editor.customContextMenuRequested.connect(self.show_editor_menu)
         self.shortcut_guide = None
@@ -890,7 +871,6 @@ class MainWindow(QMainWindow):
         QApplication.instance().installEventFilter(self)
         self.resize(1100, 750)
         self.restore_window()
-        self.place_web()
         self.pending_view = None
         self.load_file(path)
 
@@ -1405,7 +1385,7 @@ class MainWindow(QMainWindow):
         }
         # a new link's page is fetched once it is accepted
         if self.page.cards_shown:
-            self.fill_grid(previews=False)
+            self.fill_grid()
 
         def accept():
             self.editor.setExtraSelections([])
@@ -1530,9 +1510,6 @@ class MainWindow(QMainWindow):
 
     def show_map(self):
         self.stack.setCurrentWidget(self.map_page)
-        # hiding the viewer queues the splitter's re-layout, so until it runs the map has the
-        # narrower width the viewer left it and any centring would be off by the difference
-        QApplication.sendPostedEvents(self.split, QEvent.Type.LayoutRequest)
 
     def save_view(self):
         if self.in_contacts():
@@ -1570,27 +1547,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
-        self.place_web()
         self.toast.place()
-
-    def place_web(self):
-        # a placement chosen with the keys lasts until the pane is hidden
-        if self.web.isHidden():
-            self.web_side = None
-        if self.web_side is None:
-            tall = self.height() > self.width()
-            self.split.setOrientation(
-                Qt.Orientation.Vertical if tall else Qt.Orientation.Horizontal
-            )
-
-    def toggle_web(self, side):
-        if not self.web.isHidden() and self.split.orientation() == side:
-            self.web.hide()
-            return
-        self.web_side = side
-        self.split.setOrientation(side)
-        self.web.show()
-        self.size_split()
 
     def changeEvent(self, e):
         super().changeEvent(e)
@@ -1600,11 +1557,6 @@ class MainWindow(QMainWindow):
     def paintEvent(self, e):
         super().paintEvent(e)
         paint_border(self)
-
-    def size_split(self):
-        vertical = self.split.orientation() == Qt.Orientation.Vertical
-        total = self.split.height() if vertical else self.split.width()
-        self.split.setSizes([total * 3 // 5, total * 2 // 5])
 
     def check_from_card(self, pid, block):
         # card checkboxes are only reachable on the map, where every project is saved
@@ -1731,21 +1683,6 @@ class MainWindow(QMainWindow):
             return True
         if (
             kind in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress)
-            and e.modifiers() == CTRL_SHIFT
-            and e.key() in WEB_KEYS
-            and isinstance(obj, QWidget)
-            and obj.window() is self
-            # the chord belongs to the links card; elsewhere it selects by word and line
-            and self.in_links()
-        ):
-            # QTextEdit claims Ctrl+Shift+Right, so the override is accepted here first
-            if kind == QEvent.Type.ShortcutOverride:
-                e.accept()
-            elif not e.isAutoRepeat():
-                self.toggle_web(WEB_KEYS[e.key()])
-            return True
-        if (
-            kind in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress)
             and e.modifiers() == Qt.KeyboardModifier.ControlModifier
             and e.key() in HISTORY_KEYS
             and self.settings["ctrl_arrows"] == "History"
@@ -1798,15 +1735,6 @@ class MainWindow(QMainWindow):
         ):
             if not e.isAutoRepeat():
                 self.open_find()
-            return True
-        if (
-            kind == QEvent.Type.MouseButtonPress
-            and e.button() == Qt.MouseButton.MiddleButton
-            and e.modifiers() == Qt.KeyboardModifier.ControlModifier
-            and isinstance(obj, QWidget)
-            and self.web.isAncestorOf(obj)
-        ):
-            self.web.view.setZoomFactor(1.0)
             return True
         if (
             kind == QEvent.Type.KeyPress
@@ -1908,17 +1836,6 @@ class MainWindow(QMainWindow):
         finally:
             self.zoom_applying = False
 
-    def show_web(self, url=""):
-        was_hidden = self.web.isHidden()
-        if was_hidden:
-            self.place_web()
-        if url:
-            self.web.show_url(url)
-        else:
-            self.web.show()
-        if was_hidden:
-            self.size_split()
-
     def link_row_clicked(self, pid, block, external):
         # link rows are only openable on the map, where every project is saved
         doc = m.open_doc(self.store, pid, self.mode_of(pid))
@@ -1930,7 +1847,7 @@ class MainWindow(QMainWindow):
             return
 
     def open_link(self, href, external):
-        # a path link opens through the desktop, never the viewer; external means its folder.
+        # a path link opens through the desktop; external means its folder.
         # An rdoc spot opens in rdoc, which is started when it is not running
         self.editor.mark_visited(href)
         if m.is_path_link(href):
@@ -1941,10 +1858,8 @@ class MainWindow(QMainWindow):
                     )
             else:
                 QDesktopServices.openUrl(m.path_open_url(href, external))
-        elif external or href.startswith("mailto:"):
-            QDesktopServices.openUrl(QUrl(href))
         else:
-            self.show_web(href)
+            QDesktopServices.openUrl(QUrl(href))
 
     @property
     def on_urgent(self):
@@ -1976,8 +1891,6 @@ class MainWindow(QMainWindow):
         self.urgent.suppress(text_page and self.settings["notepad_hide_urgent"])
 
     def leave_page(self):
-        # the viewer belongs to the page it was opened on; only a links view keeps it
-        self.web.hide()
         self.close_finds()
 
     def show_editor_menu(self, pos):
@@ -2628,7 +2541,7 @@ class MainWindow(QMainWindow):
             self.load_board([*self.board_path, pid])
             self.push("")
         elif card.type == "page":
-            self.show_web(card.url)
+            QDesktopServices.openUrl(QUrl(card.url))
         else:
             self.open_project(pid, block)
 
@@ -3364,38 +3277,16 @@ class MainWindow(QMainWindow):
         path = self.locate(pid)
         if path is None:
             return
-        snap = f"img/{pid}_snap.png" if r["png"] else ""
-        if snap:
-            store.put_image(snap, r["png"])
-        fields = {"title": r["title"], "tags": list(r["tags"]), "snap": snap}
+        fields = {"title": r["title"], "tags": list(r["tags"]), "snap": ""}
         self.amend(pid, fields)
         if path == self.board_path:
             card = self.cards[pid]
             card.set_title(r["title"])
             card.tags = list(r["tags"])
-            if snap:
-                self.snaps[pid] = snap
-                card.set_snapshot(QImage.fromData(r["png"]))
         # only this card is written: the layout save would end a text block being typed
         mp = map_at(store, path)
         {d["id"]: d for d in mp["cards"]}[pid].update(fields)
         put_map_at(store, path, mp)
-
-    def refresh_page_card(self, card):
-        store, pid = self.store, card.pid
-
-        def done(r):
-            if self.claude_defers(done, r):
-                return
-            # a failed fetch keeps the old snapshot, and the title and tags stay as edited; the
-            # card is looked up again, a Reject having rebuilt the scene
-            card = self.cards[pid]
-            if r["png"]:
-                self.page_fetched(
-                    store, pid, {**r, "title": card.title, "tags": list(card.tags)}
-                )
-
-        self.fetch(fetch_page, card.url, done)
 
     def url_dropped(self, url, pos, target):
         if target is not None and target.type == "links":
@@ -3524,53 +3415,16 @@ class MainWindow(QMainWindow):
             self.save_current()
             self.save_layout()
 
-    def fill_grid(self, previews=True):
+    def fill_grid(self):
         entries = link_entries(self.doc)
         have = self.store.image_names()
+        # snapshots stored by earlier versions still show
         snaps = {
             u: self.store.get_image(snap_name(u))
             for u, _ in entries
             if snap_name(u) in have
         }
         self.page.grid.fill(entries, snaps)
-        if previews:
-            self.want_previews([u for u, _ in entries if u not in snaps])
-
-    def want_previews(self, urls):
-        for u in urls:
-            key = (self.store, u)
-            if u not in self.preview_failed and key not in self.preview_busy:
-                self.preview_busy.add(key)
-                self.preview_queue.append(key)
-        self.pump_previews()
-
-    def pump_previews(self):
-        while self.previews_active < PREVIEW_FETCHES and self.preview_queue:
-            store, url = self.preview_queue.pop(0)
-            if store is not self.store:
-                self.preview_busy.discard((store, url))
-                continue
-            self.previews_active += 1
-            self.fetch(
-                fetch_page,
-                url,
-                lambda r, s=store, u=url: self.preview_done(s, u, r),
-            )
-
-    def preview_done(self, store, url, r):
-        self.previews_active -= 1
-        self.preview_busy.discard((store, url))
-        if store is self.store:
-            if r["png"]:
-                store.put_image(snap_name(url), r["png"])
-                self.page.grid.set_snapshot(url, r["png"])
-            else:
-                self.preview_failed.add(url)
-        self.pump_previews()
-
-    def refresh_preview(self, url):
-        self.preview_failed.discard(url)
-        self.want_previews([url])
 
     def edit_links(self, edit):
         edit(self.doc)

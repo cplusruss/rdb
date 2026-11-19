@@ -6,6 +6,7 @@
 !/requirements.txt
 !/install_rdb.bat
 !/build_exe.bat
+!/release.ps1
 !/.github/
 !/src/
 /src/*

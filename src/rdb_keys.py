@@ -58,8 +58,6 @@ SECTIONS = (
             ("Find in page", ("Ctrl+F",)),
             ("Next match", ("F3",)),
             ("Previous match", ("Shift+F3",)),
-            ("Web view beside", ("Ctrl+Shift+Right",)),
-            ("Web view below", ("Ctrl+Shift+Down",)),
             ("File menu", ("Alt+F",)),
             ("New file", ("Ctrl+Shift+N",)),
             ("Open file", ("Ctrl+O",)),
